@@ -7,7 +7,7 @@
 
 #ifndef INC_DHT11_SENSORS_H_
 #define INC_DHT11_SENSORS_H_
-
+#include "main.h"
 typedef struct {
 	float Temperature;
 	float Humidity;

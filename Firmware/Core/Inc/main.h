@@ -61,6 +61,8 @@ void Error_Handler(void);
 #define LORA_CS_GPIO_Port GPIOA
 #define LORA_RST_Pin GPIO_PIN_0
 #define LORA_RST_GPIO_Port GPIOB
+#define DS18B20_Pin GPIO_PIN_10
+#define DS18B20_GPIO_Port GPIOB
 #define DHT_11_Pin GPIO_PIN_11
 #define DHT_11_GPIO_Port GPIOB
 
