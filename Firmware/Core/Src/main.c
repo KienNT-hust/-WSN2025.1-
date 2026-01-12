@@ -22,6 +22,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <SMS_Sensors.h>
 #include <DHT11_Sensors.h>
@@ -58,7 +59,7 @@ SX1278_hw_t SX1278_hw;
 SX1278_t SX1278;
 int master;
 int ret;
-char buffer[512];
+uint8_t buffer[512];
 int message;
 int message_length;
 /* USER CODE END PV */
@@ -79,41 +80,18 @@ int _write(int file, char *ptr, int len) {
 }
 
 void ReadAllSensors(void) {
-    char uart_buf[256];
-
-    // 1. Đọc cảm biến Độ ẩm đất (SMS_v1 - Analog)
+    // 1. Đọc cảm biến độ ẩm đất và DHT11 (nhanh, không gây treo lâu)
     SMS_Data_t soil_data = read_SMS_V1(&hadc1);
-
-    // 2. Đọc cảm biến DHT11 (Môi trường - Digital)
-    // Chân DHT_11_Pin được định nghĩa trong MX_GPIO_Init (thường là PA0)
     DHT11_Data_t dht_data = DHT11_Read(DHT_11_GPIO_Port, DHT_11_Pin);
 
-    // 3. Đọc cảm biến DS18B20 (Nhiệt độ chính xác - 1-Wire)
-    float ds_temp = DS18B20_ReadTemp();
+    // 2. LẤY KẾT QUẢ DS18B20 (Không dùng ReadTemp cũ nữa)
+    float ds_temp = DS18B20_GetTempResult();
 
-    // 4. Định dạng và In dữ liệu qua UART1
-    printf("\r\n--- SENSOR DATA REPORT ---\r\n");
+    // 3. In và Gửi dữ liệu
+    printf("Soil: %d%% | Env: %.1f C | DS18B20: %.1f C\r\n",
+            soil_data.moist_pct, dht_data.Temperature, ds_temp);
 
-    // In SMS_V1
-    printf("Soil Moisture: %d%% (ADC: %d)\r\n", soil_data.moist_pct, soil_data.adc_raw);
-
-    // In DHT11 (Tách float)
-    int t_int = (int)dht_data.Temperature;
-    int t_dec = (int)((dht_data.Temperature - t_int) * 10);
-    int h_int = (int)dht_data.Humidity;
-    int h_dec = (int)((dht_data.Humidity - h_int) * 10);
-    printf("Env Temp: %d.%d C | Env Hum: %d.%d %%\r\n", t_int, abs(t_dec), h_int, abs(h_dec));
-
-    // In DS18B20
-    if (ds_temp != -999.0) {
-        int ds_int = (int)ds_temp;
-        int ds_dec = (int)((ds_temp - ds_int) * 10);
-        printf("Water Temp (DS18B20): %d.%d C\r\n", ds_int, abs(ds_dec));
-    } else {
-        printf("Water Temp: ERROR (Not Found)\r\n");
-    }
-
-    printf("--------------------------\r\n");
+    Send_Sensor_Data(Node_assigned_slot, dht_data.Temperature, dht_data.Humidity, ds_temp, (float)soil_data.moist_pct);
 }
 
 /* USER CODE END PFP */
@@ -155,6 +133,7 @@ int main(void)
   MX_ADC1_Init();
   MX_USART1_UART_Init();
   MX_SPI1_Init();
+  DWT_Init();
   /* USER CODE BEGIN 2 */
 //  master = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0);
 //
@@ -178,7 +157,7 @@ int main(void)
   printf("Configuring LoRa module...\r\n");
   // Cấu hình: 433MHz, 17dBm, SF7, BW 125kHz, CR 4/5, CRC ON
   SX1278_init(&SX1278, 433000000, SX1278_POWER_17DBM, SX1278_LORA_SF_7,
-			  SX1278_LORA_BW_125KHZ, SX1278_LORA_CR_4_5, SX1278_LORA_CRC_EN, 8);
+			  SX1278_LORA_BW_125KHZ, SX1278_LORA_CR_4_5, SX1278_LORA_CRC_EN, 15);
   printf("Done configuring LoRa Module.\r\n");
 
 
@@ -193,6 +172,9 @@ int main(void)
       printf("DS18B20 Found!\n");
   }
 
+//  SX1278_receive(&SX1278, (uint8_t)sizeof(buffer), 1000);
+//  printf("LoRa listening for SYNC...\n");
+  SX1278_receive(&SX1278, 15, 1000); // Bắt đầu nghe
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -200,28 +182,30 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-	  float temp = DS18B20_ReadTemp();
+	  uint32_t now = HAL_GetTick();
 
-	      if (temp != -999.0) { // Nếu cảm biến hoạt động bình thường
-	          char uart_buf[64];
+	      // 1. Luôn ưu tiên lắng nghe LoRa
+	      if (SX1278_available(&SX1278)) {
+	          SX1278_read(&SX1278, buffer, 15);
+	          if (buffer[1] == PKT_SYNC) handle_sync_packet(buffer);
+	          if (buffer[1] == PKT_JOIN_ACK) handle_join_ack(buffer);
 
-	          // Tách phần nguyên và phần thập phân (1 chữ số)
-	          int temp_int = (int)temp;
-	          int temp_dec = (int)((temp - temp_int) * 10);
-	          if (temp_dec < 0) temp_dec = -temp_dec; // Tránh lỗi khi nhiệt độ âm
-
-	          sprintf(uart_buf, "DS18B20 Temperature: %d.%d C\r\n", temp_int, temp_dec);
-	          HAL_UART_Transmit(&huart1, (uint8_t*)uart_buf, strlen(uart_buf), 100);
-	      } else {
-	          char *err_msg = "Error: Could not read DS18B20\r\n";
-	          HAL_UART_Transmit(&huart1, (uint8_t*)err_msg, strlen(err_msg), 100);
+	          // Quay lại nhận sau khi xử lý gói
+	          SX1278_receive(&SX1278, 15, 1000);
 	      }
 
-	      ReadAllSensors();
-
-
-	      HAL_Delay(2000); // Đợi 2 giây trước lần đo tiếp theo
-    /* USER CODE BEGIN 3 */
+	      // 2. Kiểm tra giờ hành động
+	      if (target_action_time != 0 && now >= target_action_time) {
+	          if (node_state == STATE_WAIT_TO_JOIN) {
+	              Send_Join_Request(); // Hàm này giờ đã có lệnh receive ở cuối
+	          }
+	          else if (node_state == STATE_WAIT_MY_SLOT) {
+	              ReadAllSensors();
+	              // Sau khi gửi DATA xong, cũng phải bật lại chế độ nhận để chờ SYNC sau
+	              SX1278_receive(&SX1278, 15, 1000);
+	          }
+	          target_action_time = 0;
+	      }
   }
   /* USER CODE END 3 */
 }

@@ -9,7 +9,6 @@
 #include <stdio.h>
 #include <string.h>
 
-// XÓA BỎ các hàm delay_us và DHT11_Init_Timer cũ ở đây
 
 // --- HÀM RIÊNG TƯ (Helper Functions) ---
 static void Set_Pin_Output(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin) {

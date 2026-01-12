@@ -26,6 +26,13 @@ typedef enum {
 } NodeState_t;
 
 
+extern uint8_t Node_assigned_slot;
+extern uint8_t is_joined;
+extern NodeState_t node_state;
+extern uint32_t target_action_time; // Biến mốc thời gian hành động
+
+
+
 
 // 1. Gói SYNC (4 Bytes)
 typedef struct __attribute__((packed)) {
@@ -65,7 +72,7 @@ typedef struct __attribute__((packed)) {
 //gói 1
 void Send_Join_Request(void);
 //gói 2
-void Send_Sensor_Data(uint8_t id, float t_e, float h_e, float t_s, float h_s, float bat);
+void Send_Sensor_Data(uint8_t id, float t_e, float h_e, float t_s, float h_s);
 //gói 3
 void handle_sync_packet(uint8_t *buffer);
 //gói 4

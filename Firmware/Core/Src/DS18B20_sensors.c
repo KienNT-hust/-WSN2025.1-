@@ -87,3 +87,28 @@ float DS18B20_ReadTemp(void) {
     temp_raw = (data[1] << 8) | data[0];
     return (float)temp_raw / 16.0;
 }
+
+// Hàm 1: Chỉ gửi lệnh yêu cầu các cảm biến bắt đầu đo nhiệt độ
+void DS18B20_StartMeasure(void) {
+    if (DS18B20_Reset()) {
+        DS18B20_WriteByte(DS18B20_CMD_SKIPROM);
+        DS18B20_WriteByte(DS18B20_CMD_CONVERTTEMP); // Lệnh 0x44
+    }
+}
+
+// Hàm 2: Chỉ vào đọc giá trị từ bộ nhớ đệm (Chỉ gọi khi đã đợi đủ >750ms)
+float DS18B20_GetTempResult(void) {
+    uint8_t data[2];
+    int16_t temp_raw;
+
+    if (!DS18B20_Reset()) return -999.0;
+
+    DS18B20_WriteByte(DS18B20_CMD_SKIPROM);
+    DS18B20_WriteByte(DS18B20_CMD_RSCRATCHPAD); // Lệnh 0xBE
+
+    data[0] = DS18B20_ReadByte(); // LSB
+    data[1] = DS18B20_ReadByte(); // MSB
+
+    temp_raw = (data[1] << 8) | data[0];
+    return (float)temp_raw / 16.0; // Chuyển đổi giá trị 12-bit
+}

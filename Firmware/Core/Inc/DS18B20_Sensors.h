@@ -22,5 +22,6 @@
 
 uint8_t DS18B20_Init(void);   // Kiểm tra sự hiện diện của cảm biến
 float DS18B20_ReadTemp(void); // Đọc nhiệt độ (trả về số thực)
-
+void DS18B20_StartMeasure(void);
+float DS18B20_GetTempResult(void);
 #endif /* INC_DS18B20_SENSORS_H_ */
