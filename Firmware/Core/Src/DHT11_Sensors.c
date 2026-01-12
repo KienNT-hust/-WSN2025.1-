@@ -3,13 +3,13 @@
  * Created on: Dec 04, 2025
  * Author: KienNT
  */
-
+#include "main.h"
 #include "DHT11_Sensors.h"
 #include "delay_util.h"
 #include <stdio.h>
 #include <string.h>
 
-
+uint16_t timeout = 0;
 // --- HÀM RIÊNG TƯ (Helper Functions) ---
 static void Set_Pin_Output(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin) {
     GPIO_InitTypeDef GPIO_InitStruct = {0};
@@ -57,12 +57,12 @@ DHT11_Data_t DHT11_Read(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin) {
     // --- ĐỌC DATA ---
     for (int i = 0; i < 5; i++) {
         for (int j = 0; j < 8; j++) {
-            while (!(HAL_GPIO_ReadPin(GPIOx, GPIO_Pin)));
-            delay_us(40);
-            if (HAL_GPIO_ReadPin(GPIOx, GPIO_Pin)) {
-                data[i] |= (1 << (7 - j));
-                while (HAL_GPIO_ReadPin(GPIOx, GPIO_Pin));
-            }
+        	timeout = 0;
+        	while (!(HAL_GPIO_ReadPin(GPIOx, GPIO_Pin))) {
+        	    timeout++;
+        	    if (timeout > 1000) return result; // Thoát nếu kẹt quá lâu
+        	    delay_us(1);
+        	}
         }
     }
 

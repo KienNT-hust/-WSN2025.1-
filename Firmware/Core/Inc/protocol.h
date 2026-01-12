@@ -26,10 +26,10 @@ typedef enum {
 } NodeState_t;
 
 
-extern uint8_t Node_assigned_slot;
-extern uint8_t is_joined;
-extern NodeState_t node_state;
-extern uint32_t target_action_time; // Biến mốc thời gian hành động
+extern volatile uint8_t Node_assigned_slot;
+extern volatile uint8_t is_joined;
+extern volatile NodeState_t node_state;
+extern volatile uint32_t target_action_time; // Biến mốc thời gian hành động
 
 
 
@@ -41,33 +41,41 @@ typedef struct __attribute__((packed)) {
     uint16_t cycle_id; // ID chu kỳ
 } Sync_Packet;
 
-// 2. Gói JOIN_REQ (6 Bytes)
+// 2. Gói JOIN_REQ (14 Bytes)
+//typedef struct __attribute__((packed)) {
+//    uint8_t header;      // 0xAA
+//    uint8_t type;        // 0x02
+//    uint32_t device_uuid0; // 4 bytes cuối của UID STM32
+//    uint32_t device_uuid1;
+//    uint32_t device_uuid2;
+//} JoinReq_Packet;
+
 typedef struct __attribute__((packed)) {
-    uint8_t header;      // 0xAA
-    uint8_t type;        // 0x02
-    uint32_t device_uuid; // 4 bytes cuối của UID STM32
+    uint8_t header;
+    uint8_t type;
+    uint8_t device_uuid[12]; // Chuyển từ uint32_t sang mảng 12 byte
 } JoinReq_Packet;
 
 // 3. Gói JOIN_ACK (7 Bytes)
 typedef struct __attribute__((packed)) {
-    uint8_t header;       // 0xAA
-    uint8_t type;         // 0x03
-    uint32_t device_uuid;
-    uint8_t assigned_slot;
+    uint8_t header;
+    uint8_t type;
+    uint8_t device_uuid[12];
+    uint8_t assigned_id;
+    uint8_t slot_time;
 } JoinAck_Packet;
 
-// 4. Gói DATA (13 Bytes)
+// 4. Gói DATA (11 Bytes)
 typedef struct __attribute__((packed)) {
-    uint8_t header;    // 0xAA
-    uint8_t type;      // 0x04
+    uint8_t header;
+    uint8_t type;
     uint8_t node_id;
-    int16_t temp_env;  // x100 bỏ qua phần thập phân vd 25.26 -> 2526
-    uint16_t hum_env;  // x100
-    int16_t temp_soil; // x100
-    uint16_t hum_soil; // x100
-    //uint16_t bat;
+    int16_t temp_env;
+    uint16_t hum_env;
+    int16_t temp_soil;
+    uint16_t hum_soil;
+//    uint8_t pin_level; // Thêm mức pin theo code Gateway mới
 } Data_Packet;
-
 
 //gói 1
 void Send_Join_Request(void);
